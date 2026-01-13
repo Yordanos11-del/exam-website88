@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take Exam</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📝 Exam</h1>
+            <a href="index.html" class="btn">Back to Home</a>
+        </header>
+        
+        <div class="exam-container">
+            <div class="exam-info">
+                <input type="text" id="studentName" placeholder="Enter your name" required>
+                <div id="timer">Time: 60:00</div>
+            </div>
+            
+            <form id="examForm">
+                <div id="questionsContainer"></div>
+                <button type="submit" class="btn submit-btn">Submit Exam</button>
+            </form>
+            
+            <div id="result"></div>
+        </div>
+    </div>
+    
+    <script>
+        let timer;
+        let timeLeft = 60 * 60; // 60 minutes in seconds
+        
+        // Load questions and start timer
+        window.onload = async function() {
+            await loadExamQuestions();
+            startTimer();
+        };
+        
+        async function loadExamQuestions() {
+            try {
+                const response = await fetch('http://localhost:5000/api/questions');
+                const questions = await response.json();
+                
+                const container = document.getElementById('questionsContainer');
+                container.innerHTML = '';
+                
+                questions.forEach((q, index) => {
+                    const questionDiv = document.createElement('div');
+                    questionDiv.className = 'question-card';
+                    questionDiv.innerHTML = `
+                        <h3>Question ${index + 1} (${q.marks} marks)</h3>
+                        <p>${q.question}</p>
+                        ${q.fileUrl ? `<img src="${q.fileUrl}" alt="Question image" style="max-width: 300px;">` : ''}
+                        <div class="options">
+                            ${q.options.map((option, i) => `
+                                <label>
+                                    <input type="radio" name="q${q.id}" value="${String.fromCharCode(65 + i)}">
+                                    ${option}
+                                </label>
+                            `).join('')}
+                        </div>
+                    `;
+                    container.appendChild(questionDiv);
+                });
+            } catch (error) {
+                console.error('Error loading questions:', error);
+            }
+        }
+        
+        function startTimer() {
+            timer = setInterval(() => {
+                timeLeft--;
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                document.getElementById('timer').textContent = 
+                    `Time: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    submitExam();
+                }
+            }, 1000);
+        }
+        
+        document.getElementById('examForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            submitExam();
+        });
+        
+        async function submitExam() {
+            clearInterval(timer);
+            
+            const studentName = document.getElementById('studentName').value || 'Anonymous';
+            const answers = [];
+            
+            // Collect answers
+            document.querySelectorAll('.question-card').forEach(card => {
+                const radioButtons = card.querySelectorAll('input[type="radio"]:checked');
+                radioButtons.forEach(radio => {
+                    const questionId = parseInt(radio.name.substring(1));
+                    answers.push({
+                        questionId,
+                        selectedOption: radio.value
+                    });
+                });
+            });
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/submit-exam', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        studentName,
+                        answers
+                    })
+                });
+                
+                const result = await response.json();
+                displayResult(result);
+            } catch (error) {
+                console.error('Error submitting exam:', error);
+            }
+        }
+        
+        function displayResult(result) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                <div class="result-card">
+                    <h2>🎯 Exam Result</h2>
+                    <p><strong>Student:</strong> ${result.studentName}</p>
+                    <p><strong>Score:</strong> ${result.score}/${result.totalMarks}</p>
+                    <p><strong>Percentage:</strong> ${result.percentage}%</p>
+                    <p><strong>Submitted:</strong> ${new Date(result.submittedAt).toLocaleString()}</p>
+                    
+                    <h3>Detailed Results:</h3>
+                    ${result.results.map(r => `
+                        <div class="result-item ${r.isCorrect ? 'correct' : 'incorrect'}">
+                            <p><strong>Q${r.questionId}:</strong> ${r.question}</p>
+                            <p>Your answer: ${r.selectedOption} | 
+                               Correct answer: ${r.correctAnswer} | 
+                               ${r.isCorrect ? '✅ Correct' : '❌ Incorrect'}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

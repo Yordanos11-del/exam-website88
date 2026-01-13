@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Portal</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 Exam Portal</h1>
+            <p>Upload your study materials and take exams</p>
+        </header>
+        
+        <div class="menu">
+            <a href="admin.html" class="btn">Admin Panel</a>
+            <a href="exam.html" class="btn">Take Exam</a>
+        </div>
+        
+        <div class="upload-section">
+            <h2>Upload Study Materials</h2>
+            <form id="uploadForm">
+                <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.jpg,.png">
+                <button type="submit" class="btn">Upload File</button>
+            </form>
+            <div id="uploadStatus"></div>
+        </div>
+        
+        <div class="features">
+            <div class="feature-card">
+                <h3>📄 Upload Files</h3>
+                <p>Upload PDFs, Word documents, text files, or images</p>
+            </div>
+            <div class="feature-card">
+                <h3>✍️ Create Exams</h3>
+                <p>Generate exams from your uploaded materials</p>
+            </div>
+            <div class="feature-card">
+                <h3>📝 Take Tests</h3>
+                <p>Practice with auto-generated questions</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                document.getElementById('uploadStatus').innerHTML = `
+                    <div class="success">
+                        ✅ File uploaded successfully: ${result.originalname}
+                        <br>
+                        <a href="${result.path}" target="_blank">View File</a>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('uploadStatus').innerHTML = `
+                    <div class="error">❌ Error uploading file</div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

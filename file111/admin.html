@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔧 Admin Panel</h1>
+            <a href="index.html" class="btn">Back to Home</a>
+        </header>
+        
+        <div class="admin-sections">
+            <!-- File Upload for Questions -->
+            <div class="admin-card">
+                <h2>Upload Question File</h2>
+                <form id="questionFileForm">
+                    <input type="file" id="questionFile" accept=".txt,.json,.csv">
+                    <button type="submit" class="btn">Parse File</button>
+                </form>
+                <div id="parseResult"></div>
+            </div>
+            
+            <!-- Manual Question Entry -->
+            <div class="admin-card">
+                <h2>Add Question Manually</h2>
+                <form id="questionForm">
+                    <input type="text" id="question" placeholder="Enter question" required>
+                    <div id="optionsContainer">
+                        <input type="text" class="option" placeholder="Option A" required>
+                        <input type="text" class="option" placeholder="Option B" required>
+                        <input type="text" class="option" placeholder="Option C">
+                        <input type="text" class="option" placeholder="Option D">
+                    </div>
+                    <select id="correctAnswer" required>
+                        <option value="">Select correct answer</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="D">D</option>
+                    </select>
+                    <input type="number" id="marks" placeholder="Marks" value="1">
+                    <input type="text" id="fileUrl" placeholder="File URL (optional)">
+                    <button type="submit" class="btn">Add Question</button>
+                </form>
+            </div>
+            
+            <!-- View All Questions -->
+            <div class="admin-card">
+                <h2>All Questions</h2>
+                <button onclick="loadQuestions()" class="btn">Load Questions</button>
+                <div id="questionsList"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Parse question file
+        document.getElementById('questionFileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('questionFile');
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/parse-file', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                document.getElementById('parseResult').innerHTML = `
+                    <div class="success">
+                        ✅ Parsed ${result.questions.length} questions
+                        <button onclick="addParsedQuestions()" class="btn">Add to Database</button>
+                    </div>
+                `;
+                
+                // Store parsed questions temporarily
+                window.parsedQuestions = result.questions;
+            } catch (error) {
+                document.getElementById('parseResult').innerHTML = `
+                    <div class="error">❌ Error parsing file</div>
+                `;
+            }
+        });
+        
+        async function addParsedQuestions() {
+            if (!window.parsedQuestions) return;
+            
+            for (const q of window.parsedQuestions) {
+                await addQuestion(q);
+            }
+            
+            alert('All questions added successfully!');
+            loadQuestions();
+        }
+        
+        async function addQuestion(questionData) {
+            const response = await fetch('http://localhost:5000/api/questions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(questionData)
+            });
+            
+            return await response.json();
+        }
+        
+        // Manual question addition
+        document.getElementById('questionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const question = document.getElementById('question').value;
+            const options = Array.from(document.querySelectorAll('.option'))
+                .map(input => input.value)
+                .filter(value => value.trim() !== '');
+            const correctAnswer = document.getElementById('correctAnswer').value;
+            const marks = document.getElementById('marks').value;
+            const fileUrl = document.getElementById('fileUrl').value;
+            
+            const questionData = {
+                question,
+                options,
+                correctAnswer,
+                marks: parseInt(marks),
+                fileUrl
+            };
+            
+            try {
+                await addQuestion(questionData);
+                alert('Question added successfully!');
+                document.getElementById('questionForm').reset();
+                loadQuestions();
+            } catch (error) {
+                alert('Error adding question');
+            }
+        });
+        
+        // Load all questions
+        async function loadQuestions() {
+            try {
+                const response = await fetch('http://localhost:5000/api/questions');
+                const questions = await response.json();
+                
+                const questionsList = document.getElementById('questionsList');
+                questionsList.innerHTML = '';
+                
+                questions.forEach(q => {
+                    const questionDiv = document.createElement('div');
+                    questionDiv.className = 'question-item';
+                    questionDiv.innerHTML = `
+                        <h4>Q${q.id}: ${q.question}</h4>
+                        <p>Options: ${q.options.join(', ')}</p>
+                        <p>Correct: ${q.correctAnswer} | Marks: ${q.marks}</p>
+                        ${q.fileUrl ? `<p>File: <a href="${q.fileUrl}" target="_blank">View</a></p>` : ''}
+                        <hr>
+                    `;
+                    questionsList.appendChild(questionDiv);
+                });
+            } catch (error) {
+                console.error('Error loading questions:', error);
+            }
+        }
+    </script>
+</body>
+</html>
